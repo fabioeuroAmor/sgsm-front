@@ -481,11 +481,14 @@ export function AgendamentosPage() {
                 if (medicoSelecionado) setMedicoSelecionado(null)
               }}
               placeholder="CRM ou nome do médico…"
+              disabled={buscaPacienteAtiva || !!pacienteSelecionado}
               className={[
-                'w-full rounded-2xl border pl-9 pr-4 py-2 font-sans text-sm text-[#2D3A31] outline-none transition-all duration-200 placeholder:text-[#8C9A84]/60 focus:bg-white',
-                medicoSelecionado
-                  ? 'border-[#8C9A84] bg-[#8C9A84]/10'
-                  : 'border-[#E6E2DA] bg-[#F2F0EB] focus:border-[#8C9A84]',
+                'w-full rounded-2xl border pl-9 pr-4 py-2 font-sans text-sm outline-none transition-all duration-200 placeholder:text-[#8C9A84]/60',
+                buscaPacienteAtiva || pacienteSelecionado
+                  ? 'cursor-not-allowed border-[#E6E2DA] bg-[#E6E2DA]/60 text-[#8C9A84]'
+                  : medicoSelecionado
+                    ? 'border-[#8C9A84] bg-[#8C9A84]/10 text-[#2D3A31] focus:bg-white'
+                    : 'border-[#E6E2DA] bg-[#F2F0EB] text-[#2D3A31] focus:border-[#8C9A84] focus:bg-white',
               ].join(' ')}
             />
             {/* sugestões */}
@@ -536,11 +539,14 @@ export function AgendamentosPage() {
                 if (pacienteSelecionado) setPacienteSelecionado(null)
               }}
               placeholder="CPF ou nome do paciente…"
+              disabled={buscaAtiva || !!medicoSelecionado}
               className={[
-                'w-full rounded-2xl border pl-9 pr-4 py-2 font-sans text-sm text-[#2D3A31] outline-none transition-all duration-200 placeholder:text-[#8C9A84]/60 focus:bg-white',
-                pacienteSelecionado
-                  ? 'border-[#8C9A84] bg-[#8C9A84]/10'
-                  : 'border-[#E6E2DA] bg-[#F2F0EB] focus:border-[#8C9A84]',
+                'w-full rounded-2xl border pl-9 pr-4 py-2 font-sans text-sm outline-none transition-all duration-200 placeholder:text-[#8C9A84]/60',
+                buscaAtiva || medicoSelecionado
+                  ? 'cursor-not-allowed border-[#E6E2DA] bg-[#E6E2DA]/60 text-[#8C9A84]'
+                  : pacienteSelecionado
+                    ? 'border-[#8C9A84] bg-[#8C9A84]/10 text-[#2D3A31] focus:bg-white'
+                    : 'border-[#E6E2DA] bg-[#F2F0EB] text-[#2D3A31] focus:border-[#8C9A84] focus:bg-white',
               ].join(' ')}
             />
             {sugestoesPaciente.length > 0 && (
