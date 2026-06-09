@@ -45,6 +45,14 @@ import { EmptyState } from '../components/ui/EmptyState'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+function maskCPF(v: string) {
+  const d = v.replace(/\D/g, '').slice(0, 11)
+  if (d.length <= 3) return d
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+}
+
 function formatDateTime(iso: string) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -164,6 +172,9 @@ export function AgendamentosPage() {
   const [buscaMedico, setBuscaMedico] = useState('')
   const [medicoSelecionado, setMedicoSelecionado] = useState<MedicoResponse | null>(null)
   const [todosMedicos, setTodosMedicos] = useState<MedicoResponse[]>([])
+  const [buscaPacienteStr, setBuscaPacienteStr] = useState('')
+  const [pacienteSelecionado, setPacienteSelecionado] = useState<PacienteResponse | null>(null)
+  const [todosPacientes, setTodosPacientes] = useState<PacienteResponse[]>([])
 
   // ─── wizard state ──────────────────────────────────────────────────────────
   const [wizardAberto, setWizardAberto] = useState(false)
@@ -233,16 +244,41 @@ export function AgendamentosPage() {
     setBuscaMedico('')
   }
 
+  const sugestoesPaciente = useMemo(() => {
+    if (pacienteSelecionado || !buscaPacienteStr.trim()) return []
+    const q = buscaPacienteStr.trim().toLowerCase()
+    const cpfQ = q.replace(/\D/g, '')
+    return todosPacientes.filter(p => {
+      if (cpfQ.length >= 3 && p.cpf.replace(/\D/g, '').startsWith(cpfQ)) return true
+      return p.nome.toLowerCase().includes(q)
+    }).slice(0, 6)
+  }, [buscaPacienteStr, pacienteSelecionado, todosPacientes])
+
+  const buscaPacienteAtiva = buscaPacienteStr.trim().length > 0
+  const semResultadoPaciente = buscaPacienteAtiva && !pacienteSelecionado && sugestoesPaciente.length === 0
+
+  function selecionarPaciente(p: PacienteResponse) {
+    setPacienteSelecionado(p)
+    setBuscaPacienteStr(p.nome)
+  }
+
+  function limparBuscaPaciente() {
+    setPacienteSelecionado(null)
+    setBuscaPacienteStr('')
+  }
+
   useEffect(() => {
     medicoService.listar({ ativo: true }).then(setTodosMedicos).catch(() => {})
+    pacienteService.listar({ ativo: true }).then(setTodosPacientes).catch(() => {})
   }, [])
 
   useEffect(() => {
     listar({
       ...(filtroStatus ? { status: filtroStatus } : {}),
       ...(medicoSelecionado ? { medicoId: medicoSelecionado.id } : {}),
+      ...(pacienteSelecionado ? { pacienteId: pacienteSelecionado.id } : {}),
     })
-  }, [filtroStatus, medicoSelecionado, listar])
+  }, [filtroStatus, medicoSelecionado, pacienteSelecionado, listar])
 
   // carrega pacientes ativos quando wizard abre
   useEffect(() => {
@@ -485,6 +521,59 @@ export function AgendamentosPage() {
           )}
           {semResultado && (
             <span className="font-sans text-sm text-[#C27B66] self-center">Nenhum médico encontrado</span>
+          )}
+        </div>
+
+        {/* busca por CPF ou nome do paciente */}
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="relative w-72">
+            <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8C9A84]" />
+            <input
+              type="text"
+              value={buscaPacienteStr}
+              onChange={(e) => {
+                setBuscaPacienteStr(e.target.value)
+                if (pacienteSelecionado) setPacienteSelecionado(null)
+              }}
+              placeholder="CPF ou nome do paciente…"
+              className={[
+                'w-full rounded-2xl border pl-9 pr-4 py-2 font-sans text-sm text-[#2D3A31] outline-none transition-all duration-200 placeholder:text-[#8C9A84]/60 focus:bg-white',
+                pacienteSelecionado
+                  ? 'border-[#8C9A84] bg-[#8C9A84]/10'
+                  : 'border-[#E6E2DA] bg-[#F2F0EB] focus:border-[#8C9A84]',
+              ].join(' ')}
+            />
+            {sugestoesPaciente.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-2xl border border-[#E6E2DA] bg-white shadow-lg">
+                {sugestoesPaciente.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => selecionarPaciente(p)}
+                    className="flex w-full items-start gap-2 px-4 py-2.5 text-left transition-colors hover:bg-[#F2F0EB]"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-sans text-sm font-medium text-[#2D3A31] truncate">{p.nome}</p>
+                      <p className="font-sans text-xs text-[#8C9A84]">CPF {maskCPF(p.cpf)}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {pacienteSelecionado && (
+            <div className="flex items-center gap-2 rounded-2xl border border-[#8C9A84]/40 bg-[#8C9A84]/10 px-3 py-2">
+              <span className="font-sans text-sm text-[#2D3A31]">
+                {pacienteSelecionado.nome} — CPF {maskCPF(pacienteSelecionado.cpf)}
+              </span>
+              <button onClick={limparBuscaPaciente} className="text-[#8C9A84] hover:text-[#C27B66] transition-colors">
+                <XCircle size={14} strokeWidth={1.5} />
+              </button>
+            </div>
+          )}
+          {semResultadoPaciente && (
+            <span className="font-sans text-sm text-[#C27B66] self-center">Nenhum paciente encontrado</span>
           )}
         </div>
 
