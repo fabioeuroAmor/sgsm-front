@@ -444,6 +444,7 @@ export function AgendamentosPage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-serif text-base font-semibold text-[#2D3A31] truncate">
+                    <span className="font-sans text-xs font-normal text-[#8C9A84] uppercase tracking-widest mr-1">Paciente:</span>
                     {a.pacienteNome ?? '—'}
                   </p>
                   <p className="font-sans text-xs text-[#8C9A84] truncate">
