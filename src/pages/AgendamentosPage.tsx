@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   CalendarClock,
   Plus,
@@ -17,6 +17,7 @@ import {
   Play,
   BadgeCheck,
   CreditCard,
+  Search,
 } from 'lucide-react'
 import { useAgendamentos } from '../hooks/useAgendamentos'
 import { pacienteService } from '../services/pacienteService'
@@ -160,6 +161,9 @@ export function AgendamentosPage() {
   const { agendamentos, loading, error, listar, cadastrar, cancelar, atualizarStatus } = useAgendamentos()
   const [atualizandoId, setAtualizandoId] = useState<string | null>(null)
   const [filtroStatus, setFiltroStatus] = useState<StatusAgendamento | ''>('')
+  const [buscaMedico, setBuscaMedico] = useState('')
+  const [medicoSelecionado, setMedicoSelecionado] = useState<MedicoResponse | null>(null)
+  const [todosMedicos, setTodosMedicos] = useState<MedicoResponse[]>([])
 
   // ─── wizard state ──────────────────────────────────────────────────────────
   const [wizardAberto, setWizardAberto] = useState(false)
@@ -206,9 +210,39 @@ export function AgendamentosPage() {
 
   // ─── efeitos ──────────────────────────────────────────────────────────────
 
+  const sugestoes = useMemo(() => {
+    if (medicoSelecionado || !buscaMedico.trim()) return []
+    const q = buscaMedico.trim().toLowerCase()
+    const crmQ = q.replace(/\D/g, '')
+    return todosMedicos.filter(m => {
+      if (crmQ.length >= 2 && m.crm.replace(/\D/g, '').startsWith(crmQ)) return true
+      return m.nome.toLowerCase().includes(q)
+    }).slice(0, 6)
+  }, [buscaMedico, medicoSelecionado, todosMedicos])
+
+  const buscaAtiva = buscaMedico.trim().length > 0
+  const semResultado = buscaAtiva && !medicoSelecionado && sugestoes.length === 0
+
+  function selecionarMedico(m: MedicoResponse) {
+    setMedicoSelecionado(m)
+    setBuscaMedico(m.nome)
+  }
+
+  function limparBuscaMedico() {
+    setMedicoSelecionado(null)
+    setBuscaMedico('')
+  }
+
   useEffect(() => {
-    listar(filtroStatus ? { status: filtroStatus } : {})
-  }, [filtroStatus, listar])
+    medicoService.listar({ ativo: true }).then(setTodosMedicos).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    listar({
+      ...(filtroStatus ? { status: filtroStatus } : {}),
+      ...(medicoSelecionado ? { medicoId: medicoSelecionado.id } : {}),
+    })
+  }, [filtroStatus, medicoSelecionado, listar])
 
   // carrega pacientes ativos quando wizard abre
   useEffect(() => {
@@ -397,22 +431,80 @@ export function AgendamentosPage() {
         </Button>
       </div>
 
-      {/* filtro de status */}
-      <div className="flex flex-wrap gap-2">
-        {(['', 'PENDENTE', 'CONFIRMADO', 'CONCLUIDO', 'CANCELADO'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setFiltroStatus(s as StatusAgendamento | '')}
-            className={[
-              'rounded-full border px-4 py-1.5 text-xs uppercase tracking-widest font-sans transition-all duration-200',
-              filtroStatus === s
-                ? 'bg-[#2D3A31] text-white border-[#2D3A31]'
-                : 'border-[#E6E2DA] text-[#8C9A84] hover:border-[#8C9A84]',
-            ].join(' ')}
-          >
-            {s ? STATUS_LABEL[s as StatusAgendamento] : 'Todos'}
-          </button>
-        ))}
+      {/* pesquisa + filtros */}
+      <div className="space-y-3">
+        {/* busca por CRM ou nome */}
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="relative w-72">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8C9A84]" />
+            <input
+              type="text"
+              value={buscaMedico}
+              onChange={(e) => {
+                setBuscaMedico(e.target.value)
+                if (medicoSelecionado) setMedicoSelecionado(null)
+              }}
+              placeholder="CRM ou nome do médico…"
+              className={[
+                'w-full rounded-2xl border pl-9 pr-4 py-2 font-sans text-sm text-[#2D3A31] outline-none transition-all duration-200 placeholder:text-[#8C9A84]/60 focus:bg-white',
+                medicoSelecionado
+                  ? 'border-[#8C9A84] bg-[#8C9A84]/10'
+                  : 'border-[#E6E2DA] bg-[#F2F0EB] focus:border-[#8C9A84]',
+              ].join(' ')}
+            />
+            {/* sugestões */}
+            {sugestoes.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-2xl border border-[#E6E2DA] bg-white shadow-lg">
+                {sugestoes.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => selecionarMedico(m)}
+                    className="flex w-full items-start gap-2 px-4 py-2.5 text-left transition-colors hover:bg-[#F2F0EB]"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-sans text-sm font-medium text-[#2D3A31] truncate">{m.nome}</p>
+                      <p className="font-sans text-xs text-[#8C9A84]">CRM {m.crm}/{m.crmUf} · {m.especialidade}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* feedback */}
+          {medicoSelecionado && (
+            <div className="flex items-center gap-2 rounded-2xl border border-[#8C9A84]/40 bg-[#8C9A84]/10 px-3 py-2">
+              <span className="font-sans text-sm text-[#2D3A31]">
+                Dr(a). {medicoSelecionado.nome} — CRM {medicoSelecionado.crm}/{medicoSelecionado.crmUf}
+              </span>
+              <button onClick={limparBuscaMedico} className="text-[#8C9A84] hover:text-[#C27B66] transition-colors">
+                <XCircle size={14} strokeWidth={1.5} />
+              </button>
+            </div>
+          )}
+          {semResultado && (
+            <span className="font-sans text-sm text-[#C27B66] self-center">Nenhum médico encontrado</span>
+          )}
+        </div>
+
+        {/* filtro de status */}
+        <div className="flex flex-wrap gap-2">
+          {(['', 'PENDENTE', 'CONFIRMADO', 'CONCLUIDO', 'CANCELADO'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setFiltroStatus(s as StatusAgendamento | '')}
+              className={[
+                'rounded-full border px-4 py-1.5 text-xs uppercase tracking-widest font-sans transition-all duration-200',
+                filtroStatus === s
+                  ? 'bg-[#2D3A31] text-white border-[#2D3A31]'
+                  : 'border-[#E6E2DA] text-[#8C9A84] hover:border-[#8C9A84]',
+              ].join(' ')}
+            >
+              {s ? STATUS_LABEL[s as StatusAgendamento] : 'Todos'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* erros */}
