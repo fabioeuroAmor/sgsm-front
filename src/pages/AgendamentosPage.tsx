@@ -448,6 +448,7 @@ export function AgendamentosPage() {
                     {a.pacienteNome ?? '—'}
                   </p>
                   <p className="font-sans text-xs text-[#8C9A84] truncate">
+                    <span className="uppercase tracking-widest mr-1">Serviço:</span>
                     {a.servicoMedicoNome ?? '—'}
                   </p>
                 </div>
